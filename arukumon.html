@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>あるくもん - 歩数で育てるモンスターバトル</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --shell:#23253a; --frame:#14161f; --cream:#fdf6e3; --ink:#2b2620;
+  --yellow:#ffd447; --p:#ff5964; --s:#38a3ff; --t:#4cbb6c; --purple:#b58cff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  background:var(--shell);
+  background-image:radial-gradient(circle at 50% 0%, #2e3150 0%, #23253a 60%);
+  font-family:'DotGothic16', monospace;
+  color:var(--cream);
+  display:flex; justify-content:center;
+  overscroll-behavior:none;
+}
+#device{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;padding:10px 12px 14px;}
+h1.logo{font-size:18px;text-align:center;letter-spacing:2px;color:var(--yellow);text-shadow:2px 2px 0 var(--frame);margin-bottom:6px;}
+h1.logo small{color:#9aa0c0;font-size:11px;display:block;letter-spacing:0;}
+
+/* 液晶画面 */
+#lcd{
+  border:4px solid var(--frame); border-radius:10px;
+  background:#aee3ff; position:relative; overflow:hidden;
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.25), 0 4px 0 #0c0d15;
+}
+#lcd::after{ /* 走査線 */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 1px, transparent 1px 3px);
+}
+canvas.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block;width:100%;height:auto;}
+#lcdMsg{
+  position:absolute;left:0;right:0;bottom:0;padding:6px 8px;font-size:13px;line-height:1.5;
+  background:rgba(20,22,31,.82);color:#fff;min-height:1.4em;
+}
+
+/* パネル・カード */
+.panel{background:var(--cream);color:var(--ink);border:3px solid var(--frame);border-radius:8px;
+  box-shadow:0 3px 0 #0c0d15;padding:10px;margin-top:10px;font-size:14px;line-height:1.6;}
+.panel h2{font-size:14px;border-bottom:2px dashed #c9bfa8;padding-bottom:4px;margin-bottom:6px;}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:13px;}
+.gauge{height:10px;background:#e2d8c0;border:2px solid var(--frame);border-radius:4px;overflow:hidden;margin:2px 0 4px;}
+.gauge>i{display:block;height:100%;background:linear-gradient(90deg,#ffb84d,var(--yellow));}
+.gauge.hp>i{background:linear-gradient(90deg,#7ee081,#4cbb6c);}
+
+/* ボタン */
+button{font-family:inherit;font-size:14px;cursor:pointer;}
+.btn{
+  display:block;width:100%;padding:11px 8px;margin-top:8px;
+  background:var(--yellow);color:var(--ink);
+  border:3px solid var(--frame);border-radius:8px;box-shadow:0 4px 0 #0c0d15;
+}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #0c0d15;}
+.btn.blue{background:var(--s);color:#fff;} .btn.red{background:var(--p);color:#fff;}
+.btn.green{background:var(--t);color:#fff;} .btn.gray{background:#cfc7b2;}
+.btn.purple{background:var(--purple);color:#241a3d;}
+.btn:disabled{opacity:.45;box-shadow:0 4px 0 #0c0d15;transform:none;cursor:default;}
+.btnrow{display:flex;gap:8px;} .btnrow .btn{margin-top:8px;}
+
+/* 下部ナビ */
+#nav{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px;}
+#nav button{
+  padding:9px 2px;font-size:11px;background:#31345c;color:#cfd4ff;
+  border:3px solid var(--frame);border-radius:8px;box-shadow:0 3px 0 #0c0d15;line-height:1.3;
+}
+#nav button.on{background:var(--yellow);color:var(--ink);}
+#nav .ico{display:block;font-size:16px;}
+
+.screen{display:none;flex:1;} .screen.on{display:block;}
+input[type=number],input[type=text],textarea{
+  width:100%;font-family:inherit;font-size:16px;padding:9px;border:3px solid var(--frame);
+  border-radius:8px;background:#fff;color:var(--ink);margin-top:6px;
+}
+textarea{height:74px;resize:none;word-break:break-all;}
+.small{font-size:11px;color:#6b6250;} .center{text-align:center;}
+.tag{display:inline-block;padding:0 6px;border-radius:4px;border:2px solid var(--frame);font-size:11px;color:#fff;vertical-align:middle;}
+.tag.P{background:var(--p);} .tag.S{background:var(--s);} .tag.T{background:var(--t);}
+
+/* バトル */
+#btlScene{position:relative;}
+.hpbar{position:absolute;left:6px;top:6px;background:rgba(253,246,227,.92);border:2px solid var(--frame);
+  border-radius:6px;padding:3px 6px;font-size:11px;color:var(--ink);min-width:130px;}
+.hpbar.foe{left:auto;right:6px;}
+.hpbar .gauge{margin:2px 0 0;}
+#moveBtns .btn{font-size:13px;padding:9px 6px;}
+.shake{animation:shk .3s;} @keyframes shk{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.flashwhite{animation:fw .35s;} @keyframes fw{50%{filter:brightness(3)}}
+
+/* 図鑑・ボックス */
+.dexgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;}
+.dexcell{background:#fff;border:2px solid var(--frame);border-radius:6px;padding:3px;text-align:center;font-size:9px;color:var(--ink);}
+.dexcell canvas{width:100%;} .dexcell.unknown{filter:grayscale(1);opacity:.55;}
+.boxslot{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--frame);border-radius:6px;padding:6px;margin-top:6px;color:var(--ink);}
+.boxslot canvas{width:48px;height:48px;flex:none;}
+.boxslot .info{flex:1;font-size:12px;line-height:1.4;}
+.boxslot button{padding:7px 9px;font-size:12px;background:var(--s);color:#fff;border:2px solid var(--frame);border-radius:6px;box-shadow:0 2px 0 #0c0d15;}
+dialog{border:none;background:transparent;max-width:400px;width:92%;}
+dialog::backdrop{background:rgba(10,10,20,.6);}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important;} }
+</style>
+</head>
+<body>
+<div id="device">
+  <h1 class="logo">あるくもん<small>あるいて そだてて たたかわせろ！</small></h1>
+
+  <div id="lcd">
+    <canvas id="stage" class="px" width="160" height="112"></canvas>
+    <div id="lcdMsg">…</div>
+  </div>
+
+  <!-- ホーム(育成) -->
+  <section id="scr-home" class="screen on">
+    <div class="panel" id="homePanel"></div>
+    <button class="btn" id="btnSteps">きょうの歩数を入力する</button>
+  </section>
+
+  <!-- バトル -->
+  <section id="scr-battle" class="screen">
+    <div class="panel" id="btlMenu">
+      <h2>バトル</h2>
+      <div id="gymInfo"></div>
+      <button class="btn red" id="btnGym">ジムに挑戦 (CPU戦)</button>
+      <button class="btn blue" id="btnPvp">コード対戦 (人と戦う)</button>
+      <div class="small">※たまご・幼年期は戦えないよ</div>
+    </div>
+    <div class="panel" id="btlPvpPanel" style="display:none">
+      <h2>コード対戦</h2>
+      <div class="small">相手の「モンスターコード」を貼り付けてね</div>
+      <textarea id="pvpCode" placeholder="ARK1.xxxx..."></textarea>
+      <button class="btn blue" id="btnPvpStart">この相手と戦う</button>
+      <button class="btn gray" id="btnPvpBack">もどる</button>
+    </div>
+    <div class="panel" id="btlFight" style="display:none">
+      <div id="btlLog" style="min-height:3em;font-size:13px;"></div>
+      <div id="moveBtns"></div>
+    </div>
+  </section>
+
+  <!-- ボックス -->
+  <section id="scr-box" class="screen">
+    <div class="panel">
+      <h2>れいとうボックス</h2>
+      <div class="small">3体まで成長ストップで保存。育成中の子と入れ替えできるよ(冷凍中でも対戦・交配OK)</div>
+      <div id="boxSlots"></div>
+    </div>
+  </section>
+
+  <!-- 交配・コード -->
+  <section id="scr-code" class="screen">
+    <div class="panel">
+      <h2>じぶんのモンスターコード</h2>
+      <div class="small">これを相手に送ると、対戦や交配に使ってもらえるよ</div>
+      <div id="myCodeList"></div>
+    </div>
+    <div class="panel">
+      <h2>こうはい (交配)</h2>
+      <div class="small">じぶんの成熟期モンスター × 相手のコード → ひかるたまご誕生！(ボックスに空きが1つ必要)</div>
+      <div id="breedMyPick"></div>
+      <textarea id="breedCode" placeholder="相手のモンスターコードを貼り付け"></textarea>
+      <button class="btn purple" id="btnBreed">こうはいする</button>
+    </div>
+  </section>
+
+  <!-- 図鑑 -->
+  <section id="scr-dex" class="screen">
+    <div class="panel">
+      <h2>あるくもん図鑑 <span id="dexCount" class="small"></span></h2>
+      <div class="dexgrid" id="dexGrid"></div>
+      <button class="btn" id="btnGoal" style="margin-top:12px">1日の目標歩数を変更</button>
+      <button class="btn gray" id="btnReset">データをはじめから</button>
+    </div>
+  </section>
+
+  <nav id="nav">
+    <button data-scr="home" class="on"><span class="ico">🏠</span>そだてる</button>
+    <button data-scr="battle"><span class="ico">⚔️</span>バトル</button>
+    <button data-scr="box"><span class="ico">🧊</span>ボックス</button>
+    <button data-scr="code"><span class="ico">💌</span>交配/コード</button>
+    <button data-scr="dex"><span class="ico">📖</span>図鑑</button>
+  </nav>
+
+  <dialog id="dlgSteps">
+    <div class="panel">
+      <h2>きょうの歩数</h2>
+      <div class="small">ヘルスケアの歩数を見て入力してね(同じ日はあとから修正OK)</div>
+      <input type="number" id="inpSteps" min="0" max="60000" placeholder="例: 8500">
+      <div class="btnrow">
+        <button class="btn" id="btnStepsOk">OK</button>
+        <button class="btn gray" id="btnStepsCancel">やめる</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlgGoal">
+    <div class="panel">
+      <h2>1日の目標歩数をきめよう</h2>
+      <div class="small">きみのペースでOK！この目標が進化スピードの基準になるよ(毎日達成で約2週間で最終進化)。あとから図鑑画面で変更できます</div>
+      <input type="number" id="inpGoal" min="500" max="30000" placeholder="例: 500">
+      <div class="btnrow"><button class="btn" id="btnGoalOk">これでいく！</button></div>
+    </div>
+  </dialog>
+</div>
+<script>
+/* ================= SPRITES (16x16 / .=透過) ================= */
+const SPR = {
+egg:{pal:{o:"#14161f",w:"#ffffff",g:"#dfe6ef",y:"#ffd447"},px:[
+"................",
+".....oooooo.....",
+"....owwwwwwo....",
+"...owwwwwwwwo...",
+"..owwwyywwwwwo..",
+"..owwyggywwwwo..",
+".owwwyggyywwwwo.",
+".owwwwyywwwwwwo.",
+".owwwwwwwwyyywo.",
+".owwwwwwwyggywo.",
+".owgwwwwwyggywo.",
+".owggwwwwwyywwo.",
+"..owwwwwwwwwwo..",
+"..owwwwwwwwwwo..",
+"...oowwwwwwoo...",
+".....oooooo....."]},
+hybridEgg:{pal:{o:"#14161f",w:"#e6d6ff",g:"#b58cff",y:"#fff3a0"},px:[
+"................",
+".....oooooo.....",
+"....owwwwwwo....",
+"...owwywwwwwo...",
+"..owwyyywwwwwo..",
+"..owwwywwgwwwo..",
+".owwwwwwgggwwwo.",
+".owwwwwwwgwwwwo.",
+".owgwwwwwwwwwwo.",
+".ogggwwwwwywwwo.",
+".owgwwwwwyyywwo.",
+".owwwwwwwwywwwo.",
+"..owwgwwwwwwwo..",
+"..owgggwwwwwwo..",
+"...oowgwwwwoo...",
+".....oooooo....."]},
+petiwan:{pal:{o:"#14161f",c:"#fbe8c8",w:"#ffffff",p:"#ff9db0",b:"#7a4a2b"},px:[
+"................",
+"................",
+"...oo......oo...",
+"..obbo....obbo..",
+"..obcoooooocbo..",
+"..occcccccccco..",
+".occcccccccccco.",
+".occoccccccocco.",
+".occcccccccccco.",
+".occccconccccco.",
+"..occccooccccp..",
+"..occcccccccpp..",
+"...occcccccco...",
+"...occo..occo...",
+"...oo.o..o.oo...",
+"................"].map(r=>r.replace(/n/g,"o"))},
+mokumo:{pal:{o:"#14161f",m:"#c9a6ff",d:"#9a6fe8",w:"#ffffff"},px:[
+"................",
+"................",
+"................",
+".....oooooo.....",
+"....ommmmmmo....",
+"...ommmmmmmmo...",
+"..ommdmmmmdmmo..",
+"..ommommmmommo..",
+".ommmmmmmmmmmmo.",
+".ommmmmoommmmmo.",
+".ommmmmmmmmmmmo.",
+".ommdmmmmmmdmmo.",
+"..ommmmmmmmmmo..",
+"..odmmmmmmmmdo..",
+"...oooooooooo...",
+"................"]},
+kowan:{pal:{o:"#14161f",r:"#f4a34a",c:"#fbe8c8",w:"#ffffff",k:"#d97b2e"},px:[
+"................",
+"..o.........o..",
+".oko.......oko..",
+".okro.....orko..",
+".orrooooooorrro.",
+".orrrrrrrrrrrro.",
+"orrorrrrrrrorro.",
+"orrrrrrrrrrrrro.",
+"orrrrrccccrrrro.",
+".orrrrcocorrrro.",
+".orrrrccccrrro..",
+"..orrrrrrrrro.k.",
+"..orrrrrrrrrookо",
+"...orro..orro...",
+"...o..o..o..o...",
+"................"].map(r=>r.replace(/о/g,"o"))},
+goron:{pal:{o:"#14161f",g:"#9aa3ad",d:"#6b7480",w:"#ffffff"},px:[
+"................",
+"....oooooooo....",
+"...oggggggggo...",
+"..oggdggggdggo..",
+"..oggoggggoggo..",
+".oggggggggggggo.",
+".ogdgggggggggdo.",
+"oggoggggggggogo.",
+"oggggggddgggggo.",
+"oggggggggggggго.".replace("г","g"),
+".oggdggggggdggo.",
+".oggggggggggggo.",
+"..ogggo..ogggo..",
+"..oddgo..ogddo..",
+"...oooo..oooo...",
+"................"]},
+picodora:{pal:{o:"#14161f",b:"#5fb4ff",d:"#2f7fd4",w:"#ffffff",y:"#ffd447"},px:[
+"......o.........",
+".....oyo........",
+"....oobooo......",
+"...obbbbbbo.....",
+"..obbobbobbo....",
+"..obbbbbbbbo....",
+"..obbbwwbbbo....",
+"...obbbbbbo.o...",
+"..obbbbbbbbodo..",
+".obbbbbbbbbbdo..",
+".obdbbbbbbbdo...",
+".obbbbbbbbbbo...",
+"..obbbbbbbbo....",
+"..obbo.obbo.....",
+"..o..o.o..o.....",
+"................"]},
+haneko:{pal:{o:"#14161f",y:"#ffdf6b",r:"#ff8b4a",w:"#ffffff"},px:[
+"................",
+"......oooo......",
+".....oyyyyo.....",
+"....oyyoyoyo....",
+"....oyyyyyyo....",
+"...oyyyroyyyo...",
+"..oyyyyrryyyyo..",
+".oyoyyyyyyyyoyo.",
+".oyyoyyyyyyoyyo.",
+".oyyyyyyyyyyyyo.",
+"..oyyyyyyyyyyo..",
+"...oyyyyyyyyo...",
+"....oyyyyyyo....",
+".....oryyro.....",
+".....o.oo.o.....",
+"................"]},
+garuwolf:{pal:{o:"#14161f",b:"#7f93b8",d:"#4d5f82",w:"#ffffff",r:"#ff5964"},px:[
+"..o..........o..",
+".obo........obo.",
+".obbo......obbo.",
+".obbboooooobbbo.",
+".obbbbbbbbbbbbo.",
+"obbbrbbbbbbrbbo.",
+"obbbobbbbbbobbo.",
+"obbbbbbwwbbbbbo.",
+".obbbbwwwwbbbo..",
+".obbbbbwwbbbbdo.",
+"..obbbbbbbbbddo.",
+".obbdbbbbbbdo.o.",
+".obbbbbbbbbbo...",
+"..obbo..obbo....",
+"..obo.o..o.obo..",
+"..oo........oo.."]},
+pomerin:{pal:{o:"#14161f",p:"#ffd9e8",c:"#ffb3cf",w:"#ffffff",k:"#e56a9a"},px:[
+"................",
+"....oo....oo....",
+"...opco..ocpo...",
+"..opppoooopppo..",
+".oppppppppppppo.",
+".opcpppppppcppo.",
+"oppoppppppopppo.",
+"opppppkkppppppo.",
+"oppppkppkpppppo.",
+".oppppkkppppppo.",
+".opppppppppcppo.",
+"..opcpppppppo...",
+"...oppppppppo...",
+"...oppo..oppo...",
+"....oo....oo....",
+"................"]},
+hesoten:{pal:{o:"#14161f",t:"#e8c48a",c:"#fbe8c8",w:"#ffffff",z:"#8fb6ff"},px:[
+"................",
+"................",
+"..........oz....",
+"........oo.z....",
+"..oo...otto.....",
+".otto.ottttо....".replace("о","o"),
+".ottoottttto.oo.",
+"..otttcccctootо.".replace("о","o"),
+".otttccccccttto.",
+"otttccccccccttо.".replace("о","o"),
+"otcctccccccтcto.".replace("т","c"),
+"ottttccccccttto.",
+".ottttttttttto..",
+"..ooottttooo....",
+".....oooo.......",
+"................"]},
+daikichimaru:{pal:{o:"#14161f",w:"#ffffff",b:"#a5713f",r:"#e63946",c:"#f4d7a1"},px:[
+"................",
+"..oo........oo..",
+".obwo......owbo.",
+".owwoooooooowwo.",
+".owwwwwwwwwwwwo.",
+"owwbwwwwwwwbwwo.",
+"owwоwwwwwwwоwwо.".replace(/о/g,"o"),
+"owwwwwcccwwwwwo.",
+".owwwwcocwwwwo..",
+".orrrrrrrrrrrо..".replace("о","o"),
+"..orrrrrrrrro...",
+"..owwwwwwwwwwo..",
+"..owwwwwwwwwwo..",
+"...owwo..owwo...",
+"...oo.o..o.oo...",
+"................"]},
+metalgolem:{pal:{o:"#14161f",m:"#c7d2e0",d:"#8494ab",y:"#ffd447",r:"#ff5964"},px:[
+"....oooooooo....",
+"...ommmmmmmmo...",
+"..ommrmmmmrmmo..",
+"..ommommmmommo..",
+"...ommmmmmmmo...",
+".ooommmddmmooo..",
+"ommommmmmmommmo.",
+"omdоmmmmmmоmdmо".replace(/о/g,"o")+".",
+"ommоmmyymmоmmmо".replace(/о/g,"o")+".",
+".ooоmmyymmоoo..".replace(/о/g,"o")+".",
+"..ommmmmmmmmо...".replace("о","o"),
+"..ommdmmmmdmmo..",
+"..ommmmoommmmo..",
+"..odddo..odddo..",
+"..ooooo..ooooo..",
+"................"]},
+kokedaman:{pal:{o:"#14161f",g:"#7fbf6a",d:"#4e8f3f",w:"#ffffff",p:"#ffb3cf"},px:[
+"......o.o.......",
+".....odgdo......",
+"....ogggggo.....",
+"...ogggdgggo....",
+"..ogggggggggo...",
+".ogggggggggggo..",
+".ogdgoggggogdgo.",
+".oggggggggggggo.",
+"oggggggwwgggggо".replace("о","o")+".",
+"oggpgggwwgggpgо".replace("о","o")+".",
+".ogggggggggggо..".replace("о","o"),
+".ogdggggggggdо..".replace("о","o"),
+"..ogggggggggо...".replace("о","o"),
+"...ogggo.oggо....".replace("о","o").slice(0,16),
+"....ooo...oo....",
+"................"]},
+burndorago:{pal:{o:"#14161f",r:"#ff6b4a",d:"#d43a1f",y:"#ffd447",w:"#ffffff"},px:[
+"..o.....o..o....",
+".oyo...oro.oro..",
+".oyyo.orrrorro..",
+"..oyoorrrrrrro..",
+"...orrrorrorro..",
+"..orrrrrrrrrro..",
+".orrrrrwwrrrro..",
+".orrdrrrrrrro...",
+"orrrrdrrrrrroo..",
+"orrrrrrrrrrrodo.",
+".orrrrrrrrrrddo.",
+".ordrrrrrrrdo.o.",
+"..orrrrrrrrro...",
+"..orro..orrо.....".replace("о","o").slice(0,16),
+"..o..o..o..o....",
+"................"]},
+leafdora:{pal:{o:"#14161f",g:"#6fcf6f",d:"#3f9a4e",y:"#eaff9a",w:"#ffffff"},px:[
+".....o..........",
+"....odo....o....",
+"...oggdo..odo...",
+"..ogggggoodgo...",
+"..oggoggogggо...".replace("о","o"),
+"..ogggggggggо...".replace("о","o"),
+"..ogggwwgggо....".replace("о","o"),
+"...ogggggggо.o..".replace("о","o"),
+"..oggggggggоуo..".replace("о","o").replace("у","d"),
+".oggggggggggdо..".replace("о","o"),
+".ogdggggggggо...".replace("о","o"),
+".oggggyyggggо...".replace("о","o"),
+"..oggggggggо....".replace("о","o"),
+"..oggo.oggо.....".replace("о","o"),
+"..o..o.o..o.....",
+"................"]},
+sonicfalco:{pal:{o:"#14161f",b:"#4aa8ff",d:"#1f6fd4",w:"#ffffff",y:"#ffd447"},px:[
+"........oo......",
+".......obbо.....".replace("о","o"),
+"....ooobbbbо....".replace("о","o"),
+"...obbbbobbbо...".replace("о","o"),
+"..obbbbbbbbbо...".replace("о","o"),
+".obbbbbyybbbbо..".replace("о","o"),
+"obdbbbbbbbbbbbо.".replace("о","o"),
+"obbdbbbbbbwwbbо.".replace("о","o"),
+".obbdbbbbwwwwо..".replace("о","o"),
+"..obbbbbbbwwо...".replace("о","o"),
+"...obbbbbbbо....".replace("о","o"),
+"....obbbbbо.....".replace("о","o"),
+".....obbbbbо....".replace("о","o"),
+"......oyybо.....".replace("о","o"),
+".......o..o.....",
+"................"]},
+fukurou:{pal:{o:"#14161f",b:"#b08a5a",d:"#7a5a34",w:"#fff3d6",y:"#ffd447"},px:[
+"...oo......oo...",
+"..obdo....odbo..",
+"..obbоoooоbbbо..".replace(/о/g,"o"),
+".obbbbbbbbbbbbо.".replace("о","o"),
+".obwwbbbbbbwwbо.".replace("о","o"),
+"obwowbbybbwоwbо.".replace(/о/g,"o"),
+"obwwbbуyуbbwwbо.".replace(/у/g,"y").replace("о","o"),
+".obbbbоyоbbbbо..".replace(/о/g,"o"),
+".obbwwwwwwwwbо..".replace("о","o"),
+".obwbwbwbwbwbо..".replace("о","o"),
+".obbwbwbwbwbbо..".replace("о","o"),
+"..obbwwwwwwbо...".replace("о","o"),
+"..odbbbbbbbdо...".replace("о","o"),
+"...obbbbbbbо....".replace("о","o"),
+"....oyo.oyо.....".replace("о","o"),
+"................"]},
+dorawolf:{pal:{o:"#14161f",v:"#8a6fd4",d:"#5a4494",w:"#ffffff",y:"#ffd447"},px:[
+"..o...o..o...o..",
+".ovo.oyo.oy.ovo.",
+".ovvo.oo..o.ovvо".replace("о","o"),
+".ovvvoooooovvvо.".replace("о","o"),
+".ovvvvvvvvvvvvо.".replace("о","o"),
+"ovvvуvvvvvvуvvо.".replace(/у/g,"d").replace("о","o"),
+"ovvvоvvvvvvоvvо.".replace(/о/g,"o"),
+"ovvvvvvwwvvvvvо.".replace("о","o"),
+".ovvvvwwwwvvvо..".replace("о","o"),
+".ovvvvvwwvvvvdо.".replace("о","o"),
+"..ovvvvvvvvvddо.".replace("о","o"),
+".ovvdvvvvvvdо.o.".replace("о","o"),
+".ovvvvvvvvvvо...".replace("о","o"),
+"..ovvo..ovvо....".replace("о","o"),
+"..ovo.o..o.ovо..".replace("о","o"),
+"..oo........oo.."]},
+angepome:{pal:{o:"#14161f",p:"#fff0f6",c:"#ffc2dc",w:"#ffffff",y:"#ffd447",k:"#e56a9a"},px:[
+".....oyyyyo.....",
+"....oy....yo....",
+"....oo....oo....",
+"...opco..ocpo...",
+"o.opppoooopppo.o",
+"woppppppppppppow",
+"wоpcppppppppcpоw".replace(/о/g,"o"),
+"owpоppppppоpppwо".replace(/о/g,"o"),
+"owpppppppppppwwо".replace(/о/g,"o"),
+".owppckkcppppwо.".replace("о","o"),
+"..oppkppkpppо...".replace("о","o"),
+"..opppkkppppо...".replace("о","o"),
+"...oppppppppо...".replace("о","o"),
+"...oppo..oppо...".replace("о","o"),
+"....oo....oo....",
+"................"]},
+magmatitan:{pal:{o:"#14161f",m:"#5a4a4a",d:"#3a2e2e",r:"#ff6b1f",y:"#ffd447"},px:[
+"....oooooooo....",
+"...ommrmmrmmо...".replace("о","o"),
+"..ommоmmmmоmmо..".replace(/о/g,"o"),
+"..ommmyyyymmmо..".replace("о","o"),
+"...ommmrrmmmmо..".replace("о","o"),
+".ooommmmmmmoоo..".replace("о","o"),
+"ommоmmrmmrmоmmо.".replace(/о/g,"o"),
+"omdоmrrrrrrоmdо.".replace(/о/g,"o"),
+"ommоmmryyrmоmmо.".replace(/о/g,"o"),
+".ooоmmmrrmmоoo..".replace(/о/g,"o"),
+"..ommmmmmmmmmо..".replace("о","o"),
+"..ommdmmmmdmmо..".replace("о","o"),
+"..ommmmoоmmmmо..".replace(/о/g,"o"),
+"..odddo..odddо..".replace("о","o"),
+"..ooooo..ooooо..".replace("о","o"),
+"................"]},
+prismdorago:{pal:{o:"#14161f",r:"#ff8a8a",y:"#ffe08a",g:"#9af0a0",b:"#8ac2ff",v:"#d0a0ff",w:"#ffffff"},px:[
+"..o.....o...o...",
+".ovo...oyo.oyo..",
+".ovvo.oyyyoyyо..".replace("о","o"),
+"..ovooyyyyyyyо..".replace("о","o"),
+"...oyyyoyyoyyо..".replace("о","o"),
+"..oyyyyyyyyyyо..".replace("о","o"),
+".ogggggwwggggо..".replace("о","o"),
+".oggdgggggggо...".replace("о","g").replace("d","g"),
+"obbbbbbbbbbbboо.".replace("о","o").slice(0,16),
+"obbbbbbbbbbbovо.".replace("о","o"),
+".obbbbbbbbbbvvо.".replace("о","o"),
+".ovvvvvvvvvvо.o.".replace("о","o"),
+"..ovvvvvvvvvо...".replace("о","o"),
+"..ovvo..ovvо....".replace("о","o"),
+"..o..o..o..o....",
+"................"]},
+phantomgriffon:{pal:{o:"#14161f",k:"#3a3a55",d:"#20202f",w:"#e6e6ff",r:"#b58cff"},px:[
+"o......oo......o",
+"ko....okkо....ok".replace("о","o"),
+"kko..okkkkо..okk".replace("о","o"),
+"okkookkokkkookkо".replace("о","o"),
+".okkkkkkkkkkkkо.".replace("о","o"),
+".okkrkkkkkkrkkо.".replace("о","o"),
+"okkkоkkkkkkоkkо.".replace(/о/g,"o"),
+"okkkkkkwwkkkkkо.".replace("о","o"),
+".okkkkwwwwkkkо..".replace("о","o"),
+".okkkkkwwkkkkdо.".replace("о","o"),
+"..okkkkkkkkkddо.".replace("о","o"),
+".okkdkkkkkkdо.o.".replace("о","o"),
+".okkkkkkkkkkо...".replace("о","o"),
+"..okko..okkо....".replace("о","o"),
+"..oko.o..o.okо..".replace("о","o"),
+"..oo........oo.."]},
+daikichiking:{pal:{o:"#14161f",w:"#ffffff",b:"#a5713f",r:"#e63946",y:"#ffd447",c:"#f4d7a1"},px:[
+"....y.y..y.y....",
+"....oyoyyoyо....".replace("о","o"),
+"....oyyyyyyо....".replace("о","o"),
+"..oooоoooоooо...".replace(/о/g,"o"),
+".obwooooooоowbо.".replace(/о/g,"o"),
+".owwwwwwwwwwwwо.".replace("о","o"),
+"owwbwwwwwwwbwwо.".replace("о","o"),
+"owwоwwwwwwwоwwо.".replace(/о/g,"o"),
+"owwwwwcccwwwwwо.".replace("о","o"),
+".owwwwcоcwwwwо..".replace(/о/g,"o"),
+".oyrrrrrrrrryо..".replace("о","o"),
+"..oyrrrrrrryо...".replace("о","o"),
+"..owwwwwwwwwwо..".replace("о","o"),
+"...owwo..owwо...".replace("о","o"),
+"...oo.o..o.oо...".replace("о","o"),
+"................"]}
+};
+
+/* ===LOGIC_START=== */
+/* スプライト正規化(全角/キリル紛れ対策 + 16桁保証) */
+(function(){ for(const k in SPR){ SPR[k].px = SPR[k].px.map(r=>{
+  r = String(r).replace(/[оО]/g,"o").replace(/г/g,"g").replace(/у/g,"y").replace(/т/g,"t");
+  return (r + "................").slice(0,16);
+});}})();
+
+/* ============ 種族データ ============ */
+/* type: P=パワー(赤) S=スピード(青) T=テクニック(緑)  相性 P>S>T>P */
+const SPECIES = {
+egg:        {name:"たまご",         stage:0, line:null,   type:null, dex:0},
+hybridEgg:  {name:"ひかるたまご",   stage:0, line:null,   type:null, dex:0},
+petiwan:    {name:"プチワン",       stage:1, line:"dog",    type:"P", dex:1,  desc:"うまれたての子犬。しっぽが元気"},
+mokumo:     {name:"モクモ",         stage:1, line:"dragon", type:"T", dex:2,  desc:"もこもこの謎生物。よく浮く"},
+kowan:      {name:"コワン",         stage:2, line:"dog",    type:"P", dex:3,  desc:"散歩が大好きな柴系あるくもん"},
+goron:      {name:"ゴロン",         stage:2, line:"rock",   type:"P", dex:4,  desc:"岩のからだ。転がって移動する"},
+picodora:   {name:"ピコドラ",       stage:2, line:"dragon", type:"T", dex:5,  desc:"ちいさな竜。火はまだ出ない"},
+haneko:     {name:"ハネコ",         stage:2, line:"bird",   type:"S", dex:6,  desc:"すばしっこい小鳥。歩くより飛ぶ"},
+garuwolf:   {name:"ガルウルフ",     stage:3, line:"dog",    type:"S", dex:7,  desc:"風のように駆ける孤高の狼"},
+pomerin:    {name:"ポメリン",       stage:3, line:"dog",    type:"T", dex:8,  desc:"ふわふわの毛玉戦士。かわいさも武器"},
+hesoten:    {name:"ヘソテン",       stage:3, line:"dog",    type:"P", dex:9,  desc:"いつもへそ天。でも寝技は最強"},
+daikichimaru:{name:"ダイキチ丸",    stage:3, line:"dog",    type:"P", dex:10, desc:"伝説の忠犬。赤いバンダナが目印", hidden:true},
+metalgolem: {name:"メタルゴーレム", stage:3, line:"rock",   type:"P", dex:11, desc:"鋼のからだ。守りは鉄壁"},
+kokedaman:  {name:"コケダマン",     stage:3, line:"rock",   type:"T", dex:12, desc:"苔むした癒し系。実は長生き"},
+burndorago: {name:"バーンドラゴ",   stage:3, line:"dragon", type:"P", dex:13, desc:"燃えさかる炎の竜"},
+leafdora:   {name:"リーフドラ",     stage:3, line:"dragon", type:"T", dex:14, desc:"森を守る草の竜。光合成で回復"},
+sonicfalco: {name:"ソニックファルコ",stage:3,line:"bird",   type:"S", dex:15, desc:"音速で急降下する猛禽"},
+fukurou:    {name:"フクロウ長老",   stage:3, line:"bird",   type:"T", dex:16, desc:"森の賢者。技のキレは若者以上"},
+dorawolf:   {name:"ドラウルフ",     stage:3, line:"dog",    type:"P", dex:17, desc:"竜の角を持つ狼。交配でのみ誕生", hybridOnly:true},
+angepome:   {name:"エンジェポメ",   stage:3, line:"dog",    type:"T", dex:18, desc:"天使の輪を持つ毛玉。交配でのみ誕生", hybridOnly:true},
+magmatitan: {name:"マグマタイタン", stage:3, line:"rock",   type:"P", dex:19, desc:"マグマを宿す巨人。交配でのみ誕生", hybridOnly:true},
+prismdorago:{name:"プリズムドラゴ", stage:3, line:"dragon", type:"S", dex:20, desc:"七色に輝く竜。交配でのみ誕生", hybridOnly:true},
+phantomgriffon:{name:"ファントムグリフォン",stage:3,line:"bird",type:"S",dex:21, desc:"影のグリフォン。交配でのみ誕生", hybridOnly:true},
+daikichiking:{name:"ダイキチキング",stage:3, line:"dog",    type:"P", dex:22, desc:"犬たちの王。二世代交配でのみ誕生", hybridOnly:true}
+};
+
+const MOVES = {
+petiwan:[["あまがみ","P",18],["とっしん","P",20],["ワンワン","T",16]],
+mokumo: [["もこアタック","T",18],["ふわふわ","S",16],["たいあたり","P",18]],
+kowan:  [["かみつく","P",24],["ダッシュ","S",20],["おすわり",  "T",18]],
+goron:  [["いわおとし","P",26],["ころがる","S",18],["かたくなる","T",20]],
+picodora:[["ひっかく","T",22],["しっぽ","P",20],["ちびファイア","P",24]],
+haneko: [["つつく","S",22],["かぜおこし","S",24],["ついばむ","T",18]],
+garuwolf:[["しっぷう斬り","S",34],["とおぼえ","T",26],["キバくだき","P",30]],
+pomerin:[["もふもふラッシュ","T",32],["キュートビーム","T",34],["たいあたり","P",24]],
+hesoten:[["へそてんプレス","P",36],["ねがえり","S",24],["いびきソング","T",26]],
+daikichimaru:[["忠犬タックル","P",38],["バンダナ斬り","S",30],["まもりの遠吠え","T",28]],
+metalgolem:[["メタルパンチ","P",36],["アイアンボール","P",32],["ギアドリル","T",28]],
+kokedaman:[["こけこうせん","T",34],["ねばねば","S",24],["やまびこ","P",26]],
+burndorago:[["ごうかえん","P",38],["ドラゴンテール","P",30],["ヒートウィング","S",26]],
+leafdora:[["リーフブレード","T",34],["こうごうせい","T",28],["つるのムチ","S",26]],
+sonicfalco:[["ソニックダイブ","S",36],["エアカッター","S",30],["するどいツメ","P",26]],
+fukurou:[["けんじゃの一撃","T",36],["よるのつばさ","S",28],["にらみ","P",24]],
+dorawolf:[["りゅうがのキバ","P",40],["シャドウダッシュ","S",32],["りゅうのいぶき","T",30]],
+angepome:[["ホーリーもふ","T",40],["てんしのはね","S",30],["さばきのひかり","P",32]],
+magmatitan:[["マグマナックル","P",42],["ふんか","P",34],["ようがんりゅう","T",28]],
+prismdorago:[["プリズムレイ","S",40],["にじのブレス","T",32],["ひかりのツメ","P",30]],
+phantomgriffon:[["ファントムクロー","S",40],["かげぬい","T",32],["ナイトダイブ","P",30]],
+daikichiking:[["キングオブタックル","P",44],["おうじゃの遠吠え","T",34],["ロイヤルファング","S",32]]
+};
+
+/* ============ 進化・育成ロジック ============ */
+const DEFAULT_GOAL = 7000;
+const childAt = g => Math.round((g||DEFAULT_GOAL)*4);   // 成長期: 目標4日ぶん
+const adultAt = g => Math.round((g||DEFAULT_GOAL)*14);  // 成熟期: 目標14日ぶん(毎日達成で約2週間)
+const lineBaby = l => (l==="dog"||l==="rock") ? "petiwan" : "mokumo";
+const lineChild = l => ({dog:"kowan", rock:"goron", dragon:"picodora", bird:"haneko"}[l]);
+
+function isZorome(n){ n=Math.floor(n); if(n<111) return false; const s=String(n); return [...s].every(c=>c===s[0]); }
+
+function avgRecent(entries, n=7){
+  if(!entries.length) return 0;
+  const recent = entries.slice(-n);
+  return Math.round(recent.reduce((a,e)=>a+e.steps,0)/recent.length);
+}
+
+function hatch(mon, firstSteps, goal){
+  if(mon.species==="hybridEgg"){
+    const seed=(mon.seed||0)+firstSteps;
+    mon.line = mon.parentLines[seed % mon.parentLines.length];
+    mon.species = lineBaby(mon.line);
+  }else{
+    mon.line = null; // 通常は成長期で決まる
+    mon.species = firstSteps>=(goal||DEFAULT_GOAL)*0.8 ? "petiwan" : "mokumo";
+  }
+  mon.stage=1;
+  return mon.species;
+}
+
+function evolveChild(mon, avg, goal){ const r=avg/(goal||DEFAULT_GOAL);
+  if(mon.hybrid && mon.line){ mon.species = lineChild(mon.line); }
+  else if(mon.species==="petiwan"){ mon.line = r>=0.75 ? "dog" : "rock"; mon.species=lineChild(mon.line); }
+  else { mon.line = r>=0.75 ? "dragon" : "bird"; mon.species=lineChild(mon.line); }
+  mon.stage=2;
+  return mon.species;
+}
+
+function evolveAdult(mon, avg, todaySteps, goal){ const r=avg/(goal||DEFAULT_GOAL);
+  const l=mon.line;
+  if(mon.hybrid){
+    if(mon.gen2){ mon.species="daikichiking"; }
+    else if(l==="dog"){ mon.species = r>=0.85 ? "dorawolf" : "angepome"; }
+    else if(l==="rock"){ mon.species="magmatitan"; }
+    else if(l==="dragon"){ mon.species="prismdorago"; }
+    else { mon.species="phantomgriffon"; }
+  }else if(l==="dog"){
+    if(isZorome(todaySteps)) mon.species="daikichimaru";
+    else if(r>=1.1) mon.species="garuwolf";
+    else if(r>=0.6) mon.species="pomerin";
+    else mon.species="hesoten";
+  }else if(l==="rock"){ mon.species = r>=1 ? "metalgolem" : "kokedaman"; }
+  else if(l==="dragon"){ mon.species = r>=1 ? "burndorago" : "leafdora"; }
+  else { mon.species = r>=1 ? "sonicfalco" : "fukurou"; }
+  mon.stage=3;
+  return mon.species;
+}
+
+/* 歩数入力(同日上書き可)。戻り値: 起きたイベントの配列 */
+function addSteps(mon, steps, dateStr, goal){
+  steps = Math.max(0, Math.min(60000, Math.floor(steps)));
+  const ev=[];
+  const ex = mon.entries.find(e=>e.d===dateStr);
+  if(ex){ mon.total += steps - ex.steps; ex.steps = steps; }
+  else { mon.entries.push({d:dateStr, steps}); mon.total += steps; }
+  if(mon.entries.length>60) mon.entries = mon.entries.slice(-60);
+  ev.push({t:"steps", steps});
+  if(mon.stage===0 && steps>0){ ev.push({t:"hatch", sp:hatch(mon, steps, goal)}); }
+  if(mon.stage===1 && mon.total>=childAt(goal)){ ev.push({t:"evolve", sp:evolveChild(mon, avgRecent(mon.entries), goal)}); }
+  if(mon.stage===2 && mon.total>=adultAt(goal)){ ev.push({t:"evolve", sp:evolveAdult(mon, avgRecent(mon.entries), steps, goal)}); }
+  return ev;
+}
+
+/* ============ ステータス・バトル ============ */
+function calcStats(mon, goal){
+  const st=mon.stage, hy=mon.hybrid&&st===3;
+  const eff = mon.total/Math.max(500, goal||mon.goal||DEFAULT_GOAL); // 目標◯日ぶん換算(努力ベース)
+  const hp = [20,60,90,130][st] + (hy?15:0) + Math.min(120, Math.floor(eff*4));
+  const atk= [4,10,16,24][st] + (hy?4:0) + Math.min(40, Math.floor(eff*1.4));
+  const sp = SPECIES[mon.species];
+  const spd= (sp&&sp.type==="S"?12:8) + Math.min(10, Math.floor(eff/3));
+  return {hp, atk, spd};
+}
+function typeMul(a,d){
+  if(!a||!d||a===d) return 1;
+  if((a==="P"&&d==="S")||(a==="S"&&d==="T")||(a==="T"&&d==="P")) return 1.5;
+  return 0.75;
+}
+function calcDamage(atk, move, defType, rnd){
+  return Math.max(1, Math.floor((move[2] + atk*0.6) * typeMul(move[1], defType) * (0.9 + rnd*0.2)));
+}
+
+/* ============ コード交換・交配 ============ */
+function checksum(s){ let c=0; for(let i=0;i<s.length;i++) c=(c+s.charCodeAt(i)*(i+1))%1296; return c.toString(36).padStart(2,"0"); }
+function encodeMon(mon, trainer){
+  const p={v:1, s:mon.species, t:mon.total, h:mon.hybrid?1:0, g:mon.gen2?1:0, l:mon.line, tr:trainer||"", gl:(mon.goal||(typeof G!=="undefined"&&G&&G.goal)||DEFAULT_GOAL)};
+  const b=btoa(encodeURIComponent(JSON.stringify(p)));
+  return "ARK1."+checksum(b)+"."+b;
+}
+function decodeMon(code){
+  try{
+    code = code.trim();
+    const m = code.match(/^ARK1\.([0-9a-z]{2})\.([A-Za-z0-9+/=]+)$/);
+    if(!m) return null;
+    if(checksum(m[2])!==m[1]) return null;
+    const p = JSON.parse(decodeURIComponent(atob(m[2])));
+    if(p.v!==1 || !SPECIES[p.s]) return null;
+    return {species:p.s, total:Math.max(0,Math.min(9999999,p.t|0)), hybrid:!!p.h, gen2:!!p.g, line:p.l||SPECIES[p.s].line, stage:SPECIES[p.s].stage, entries:[], trainer:String(p.tr||"").slice(0,12), goal:Math.max(500,Math.min(30000,(p.gl|0)||DEFAULT_GOAL))};
+  }catch(e){ return null; }
+}
+function isHybridSpecies(sp){ return !!(SPECIES[sp]&&SPECIES[sp].hybridOnly); }
+function breed(myMon, otherMon, dateStr){
+  if(myMon.stage!==3 || otherMon.stage!==3) return null;
+  let seed=0; const s=myMon.species+otherMon.species+dateStr;
+  for(let i=0;i<s.length;i++) seed=(seed*31+s.charCodeAt(i))>>>0;
+  return {
+    species:"hybridEgg", stage:0, total:0, entries:[],
+    hybrid:true, gen2: isHybridSpecies(myMon.species)&&isHybridSpecies(otherMon.species),
+    parentLines:[myMon.line||SPECIES[myMon.species].line, otherMon.line||SPECIES[otherMon.species].line],
+    seed: seed%97,
+    parents:[SPECIES[myMon.species].name, SPECIES[otherMon.species].name]
+  };
+}
+function newEggMon(){ return {species:"egg", stage:0, total:0, entries:[], hybrid:false, gen2:false, parentLines:null, seed:0}; }
+/* ===LOGIC_END=== */
+
+/* ================= セーブ (localStorage / 使えない環境ではメモリ) ================= */
+const SAVE_KEY="arukumon_save_v1";
+let memFallback=null;
+function loadSave(){
+  try{ const s=localStorage.getItem(SAVE_KEY); if(s) return JSON.parse(s); }catch(e){ if(memFallback) return memFallback; }
+  return null;
+}
+function saveGame(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); }catch(e){ memFallback=JSON.parse(JSON.stringify(G)); }
+}
+let G = loadSave() || {v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0, goal:null};
+if(G.goal===undefined) G.goal=null;
+
+const todayKey = ()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const seeDex = sp=>{ if(SPECIES[sp]&&SPECIES[sp].stage>0){ G.dex[sp]=true; } };
+
+/* ================= 描画 ================= */
+function drawSpriteTo(ctx, sp, x, y, scale, flip){
+  const d=SPR[sp]; if(!d) return;
+  for(let r=0;r<16;r++)for(let c=0;c<16;c++){
+    const ch=d.px[r][c]; if(ch===".") continue;
+    const col=d.pal[ch]; if(!col) continue;
+    const cx = flip ? x+(15-c)*scale : x+c*scale;
+    ctx.fillStyle=col; ctx.fillRect(cx, y+r*scale, scale, scale);
+  }
+}
+function spriteCanvas(sp, size){
+  const cv=document.createElement("canvas"); cv.width=cv.height=size; cv.className="px";
+  const ctx=cv.getContext("2d"); drawSpriteTo(ctx, sp, 0, 0, size/16, false);
+  return cv;
+}
+const stage=document.getElementById("stage"), sctx=stage.getContext("2d");
+let frame=0, battle=null;
+function skyColors(){
+  const h=new Date().getHours();
+  if(h>=5&&h<8)  return ["#ffd9a0","#ffeecb"];      // 朝
+  if(h>=8&&h<16) return ["#aee3ff","#e8f8ff"];      // 昼
+  if(h>=16&&h<19)return ["#ffb28a","#ffe3c2"];      // 夕
+  return ["#25335e","#3a4a80"];                      // 夜
+}
+function drawStage(){
+  const [c1,c2]=skyColors();
+  sctx.fillStyle=c1; sctx.fillRect(0,0,160,70);
+  sctx.fillStyle=c2; sctx.fillRect(0,70,160,16);
+  sctx.fillStyle="#7fbf6a"; sctx.fillRect(0,86,160,26);
+  sctx.fillStyle="#4e8f3f"; sctx.fillRect(0,86,160,3);
+  const nh=new Date().getHours();
+  sctx.fillStyle = (nh>=19||nh<5) ? "#fff3a0" : "#ffffff";
+  if(nh>=19||nh<5){ sctx.fillRect(128,10,10,10); sctx.fillStyle=c1; sctx.fillRect(125,8,8,8); }
+  else { sctx.fillRect(18,14,22,7); sctx.fillRect(24,10,12,5); sctx.fillRect(100,26,26,7); }
+  const bob = frame%2===0 ? 0 : 2;
+  if(battle){
+    drawSpriteTo(sctx, battle.me.mon.species, 14, 46+bob, 3, false);
+    drawSpriteTo(sctx, battle.foe.mon.species, 98, 42+(bob?0:2), 3, true);
+  }else{
+    drawSpriteTo(sctx, G.active.species, 56, 40+bob, 4, frame%4>=2);
+  }
+}
+setInterval(()=>{ frame++; drawStage(); }, 600);
+
+const lcdMsg=document.getElementById("lcdMsg");
+let msgTimer=null;
+function say(t, hold){ lcdMsg.textContent=t; if(msgTimer)clearTimeout(msgTimer); if(!hold){ msgTimer=setTimeout(homeMsg, 4500); } }
+function homeMsg(){
+  const m=G.active, sp=SPECIES[m.species];
+  if(m.stage===0){ lcdMsg.textContent="たまごが うずうずしている… 歩数を入力するとうまれるよ！"; return; }
+  const today=m.entries.find(e=>e.d===todayKey());
+  const lines=[
+    `${sp.name}は こっちを見ている`,
+    today?`きょうは ${today.steps}歩 あるいた！えらい！`:`きょうの歩数が まだだよ！`,
+    m.stage<3?`つぎの進化まで あと${Math.max(0,(m.stage===1?childAt(G.goal):adultAt(G.goal))-m.total).toLocaleString()}歩`:`りっぱに 育ったなあ…`,
+    `さいきんの平均は ${avgRecent(m.entries).toLocaleString()}歩`
+  ];
+  lcdMsg.textContent=lines[Math.floor(Math.random()*lines.length)];
+}
+
+/* ================= 画面切替 ================= */
+const screens=["home","battle","box","code","dex"];
+document.getElementById("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(battle){ say("バトル中は移動できないよ！",false); return; }
+  for(const s of screens){
+    document.getElementById("scr-"+s).classList.toggle("on", s===b.dataset.scr);
+  }
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  renderAll();
+});
+
+/* ================= ホーム ================= */
+const STAGE_NAME=["たまご","幼年期","成長期","成熟期"];
+function monLabel(m){ return m.stage===0?SPECIES[m.species].name:`${SPECIES[m.species].name} (${STAGE_NAME[m.stage]})`; }
+function renderHome(){
+  const m=G.active, sp=SPECIES[m.species], st=calcStats(m, G.goal);
+  const nextAt = m.stage===1?childAt(G.goal) : m.stage===2?adultAt(G.goal) : null;
+  const prevAt = m.stage===2?childAt(G.goal) : 0;
+  let gauge="";
+  if(m.stage>0&&nextAt){
+    const pct=Math.min(100, Math.round((m.total-prevAt)/(nextAt-prevAt)*100));
+    gauge=`<div>しんかゲージ <span class="small">(${m.total.toLocaleString()} / ${nextAt.toLocaleString()}歩)</span></div><div class="gauge"><i style="width:${pct}%"></i></div>`;
+  }else if(m.stage===3){ gauge=`<div class="small">★成熟期：歩くほど強くなる！(累計 ${m.total.toLocaleString()}歩)</div>`; }
+  const today=m.entries.find(e=>e.d===todayKey());
+  document.getElementById("homePanel").innerHTML = m.stage===0
+   ? `<h2>${sp.name}</h2><div>${m.hybrid?"こうはいで うまれた ひかるたまご。<br>どんな系統になるかは そだてかた次第…":"あたらしい いのち。歩数を入力すると うまれるよ！"}</div>`
+   : `<h2>${monLabel(m)} ${sp.type?`<span class="tag ${sp.type}">${sp.type==="P"?"パワー":sp.type==="S"?"スピード":"テクニック"}</span>`:""}</h2>
+      <div class="small">${sp.desc||""}</div>${gauge}
+      <div class="statgrid">
+        <div>HP: ${st.hp}</div><div>こうげき: ${st.atk}</div>
+        <div>すばやさ: ${st.spd}</div><div>平均歩数: ${avgRecent(m.entries).toLocaleString()}</div>
+        <div>きょう: ${today?today.steps.toLocaleString()+"歩":"未入力"}</div><div>入力日数: ${m.entries.length}日</div>
+        <div>目標: ${(G.goal||DEFAULT_GOAL).toLocaleString()}歩/日</div><div>きょうの達成率: ${today?Math.round(today.steps/(G.goal||DEFAULT_GOAL)*100)+"%":"—"}</div>
+      </div>`;
+}
+
+/* 歩数入力 */
+const dlg=document.getElementById("dlgSteps");
+document.getElementById("btnSteps").onclick=()=>{ document.getElementById("inpSteps").value=""; dlg.showModal(); };
+document.getElementById("btnStepsCancel").onclick=()=>dlg.close();
+document.getElementById("btnStepsOk").onclick=()=>{
+  const v=parseInt(document.getElementById("inpSteps").value,10);
+  if(isNaN(v)||v<0||v>60000){ alert("0〜60000で入力してね"); return; }
+  dlg.close();
+  const evs=addSteps(G.active, v, todayKey(), G.goal);
+  seeDex(G.active.species);
+  let queue=[`きょうの歩数 ${v.toLocaleString()}歩 を記録した！`];
+  for(const e of evs){
+    if(e.t==="hatch") queue.push(`たまごが かえった！ ${SPECIES[e.sp].name} が うまれた！！`);
+    if(e.t==="evolve") queue.push(`おっ…！？ すがたが かわっていく…！ ${SPECIES[e.sp].name} に しんかした！！`);
+  }
+  saveGame(); renderAll();
+  let i=0; const next=()=>{ if(i<queue.length){ say(queue[i], i<queue.length-1); i++; setTimeout(next, 2200);} };
+  next();
+  document.getElementById("lcd").classList.add("flashwhite");
+  setTimeout(()=>document.getElementById("lcd").classList.remove("flashwhite"),400);
+};
+
+/* ================= バトル ================= */
+const GYM=[
+ {name:"さんぽ見習い ハル",  sp:"haneko",     total:35000},
+ {name:"公園の主 ゴウ",      sp:"goron",      total:60000},
+ {name:"駅前ランナー ミキ",  sp:"picodora",   total:90000},
+ {name:"山道マスター テツ",  sp:"kokedaman",  total:130000},
+ {name:"風のウォーカー レン",sp:"sonicfalco", total:170000},
+ {name:"森の隠者 シズク",    sp:"fukurou",    total:210000},
+ {name:"炎の万歩計 カイ",    sp:"burndorago", total:260000},
+ {name:"伝説の散歩犬つかい", sp:"daikichimaru",total:320000}
+];
+function pickFighter(cb){
+  const cands=[["育成中",G.active], ...G.freezer.map((f,i)=>["ボックス"+(i+1),f])].filter(([,m])=>m&&m.stage>=2);
+  if(!cands.length){ say("戦えるモンスターがいないよ(成長期から参戦OK)",false); return; }
+  if(cands.length===1){ cb(cands[0][1]); return; }
+  const menu=document.getElementById("btlMenu");
+  const old=menu.innerHTML;
+  menu.innerHTML="<h2>だれで戦う？</h2>";
+  for(const [label,m] of cands){
+    const b=document.createElement("button"); b.className="btn";
+    b.textContent=`${label}: ${SPECIES[m.species].name}`;
+    b.onclick=()=>{ menu.innerHTML=old; bindBattleMenu(); cb(m); };
+    menu.appendChild(b);
+  }
+  const c=document.createElement("button"); c.className="btn gray"; c.textContent="やめる";
+  c.onclick=()=>{ menu.innerHTML=old; bindBattleMenu(); };
+  menu.appendChild(c);
+}
+function startBattle(myMon, foeMon, foeName, isGym){
+  const ms=calcStats(myMon, G.goal), fs=calcStats(foeMon, foeMon.goal);
+  battle={ me:{mon:myMon, st:ms, hp:ms.hp}, foe:{mon:foeMon, st:fs, hp:fs.hp}, isGym, foeName, over:false };
+  seeDex(foeMon.species);
+  document.getElementById("btlMenu").style.display="none";
+  document.getElementById("btlPvpPanel").style.display="none";
+  document.getElementById("btlFight").style.display="block";
+  renderHpBars();
+  renderMoves();
+  blog(`${foeName} が ${SPECIES[foeMon.species].name} をくりだした！`);
+  say(`バトル開始！ ${SPECIES[myMon.species].name} 対 ${SPECIES[foeMon.species].name}`, true);
+  drawStage();
+}
+function renderHpBars(){
+  let bars=document.getElementById("hpbars");
+  if(!bars){ bars=document.createElement("div"); bars.id="hpbars"; document.getElementById("lcd").appendChild(bars); }
+  const pc=b=>Math.max(0,Math.round(b.hp/b.st.hp*100));
+  bars.innerHTML = battle ? `
+   <div class="hpbar">${SPECIES[battle.me.mon.species].name}<div class="gauge hp"><i style="width:${pc(battle.me)}%"></i></div></div>
+   <div class="hpbar foe">${SPECIES[battle.foe.mon.species].name}<div class="gauge hp"><i style="width:${pc(battle.foe)}%"></i></div></div>` : "";
+}
+function blog(t){ document.getElementById("btlLog").innerHTML=t; }
+function renderMoves(){
+  const box=document.getElementById("moveBtns"); box.innerHTML="";
+  if(!battle||battle.over){
+    const b=document.createElement("button"); b.className="btn"; b.textContent="バトルをおわる";
+    b.onclick=endBattle; box.appendChild(b); return;
+  }
+  for(const mv of MOVES[battle.me.mon.species]){
+    const b=document.createElement("button"); b.className="btn "+(mv[1]==="P"?"red":mv[1]==="S"?"blue":"green");
+    b.innerHTML=`${mv[0]} <span class="small" style="color:#fff">威力${mv[2]}</span>`;
+    b.onclick=()=>playerTurn(mv); box.appendChild(b);
+  }
+}
+function cpuMove(){
+  const mvs=MOVES[battle.foe.mon.species];
+  if(Math.random()<0.4){
+    const adv=mvs.filter(m=>typeMul(m[1], SPECIES[battle.me.mon.species].type)>1);
+    if(adv.length) return adv[Math.floor(Math.random()*adv.length)];
+  }
+  return mvs[Math.floor(Math.random()*mvs.length)];
+}
+function attack(atkSide, defSide, mv){
+  const dmg=calcDamage(atkSide.st.atk, mv, SPECIES[defSide.mon.species].type, Math.random());
+  defSide.hp=Math.max(0, defSide.hp-dmg);
+  const eff=typeMul(mv[1], SPECIES[defSide.mon.species].type);
+  return `${SPECIES[atkSide.mon.species].name}の ${mv[0]}！ ${dmg}ダメージ${eff>1?"！こうかばつぐん！！":eff<1?"…いまひとつ":"！"}`;
+}
+function playerTurn(mv){
+  if(!battle||battle.over) return;
+  document.getElementById("moveBtns").style.pointerEvents="none";
+  const fmv=cpuMove();
+  const order = battle.me.st.spd>=battle.foe.st.spd ? [["me","foe",mv],["foe","me",fmv]] : [["foe","me",fmv],["me","foe",mv]];
+  let logs=[];
+  for(const [a,d,m] of order){
+    if(battle[a].hp<=0) continue;
+    logs.push(attack(battle[a], battle[d], m));
+    document.getElementById("lcd").classList.add("shake");
+    setTimeout(()=>document.getElementById("lcd").classList.remove("shake"),350);
+    if(battle[d].hp<=0){ logs.push(`${SPECIES[battle[d].mon.species].name}は たおれた！`); battle.over=true; battle.winner=a; break; }
+  }
+  blog(logs.join("<br>"));
+  renderHpBars();
+  if(battle.over){
+    if(battle.winner==="me"){
+      say("しょうり！！やったー！！", true);
+      if(battle.isGym && battle.gymIdx===G.gym && G.gym<GYM.length){ G.gym++; saveGame(); }
+    } else say("まけちゃった…あしたも歩いて強くなろう", true);
+  }
+  renderMoves();
+  setTimeout(()=>{ document.getElementById("moveBtns").style.pointerEvents=""; }, 400);
+}
+function endBattle(){
+  battle=null; renderHpBars();
+  document.getElementById("btlFight").style.display="none";
+  document.getElementById("btlMenu").style.display="block";
+  renderAll(); homeMsg();
+}
+function bindBattleMenu(){
+  document.getElementById("btnGym").onclick=()=>{
+    const idx=Math.min(G.gym, GYM.length-1);
+    const g=GYM[idx];
+    pickFighter(m=>{
+      const foe={species:g.sp, stage:3, total:g.total, entries:[], hybrid:false, gen2:false, line:SPECIES[g.sp].line, goal:7000};
+      startBattle(m, foe, g.name, true);
+      battle.gymIdx=idx;
+    });
+  };
+  document.getElementById("btnPvp").onclick=()=>{
+    document.getElementById("btlMenu").style.display="none";
+    document.getElementById("btlPvpPanel").style.display="block";
+  };
+}
+bindBattleMenu();
+document.getElementById("btnPvpBack").onclick=()=>{
+  document.getElementById("btlPvpPanel").style.display="none";
+  document.getElementById("btlMenu").style.display="block";
+};
+document.getElementById("btnPvpStart").onclick=()=>{
+  const d=decodeMon(document.getElementById("pvpCode").value);
+  if(!d){ alert("コードが読みとれなかったよ。コピーミスがないか確認してね"); return; }
+  if(d.stage<2){ alert("相手がまだ幼くて戦えないみたい"); return; }
+  pickFighter(m=>startBattle(m, d, d.trainer||"ライバル", false));
+};
+function renderBattleMenu(){
+  document.getElementById("gymInfo").innerHTML = G.gym>=GYM.length
+    ? `🏆 全ジム制覇！きみは伝説の散歩トレーナーだ！(再挑戦できるよ)<br>つぎの相手: ${GYM[GYM.length-1].name}`
+    : `つぎの相手: <b>${GYM[G.gym].name}</b> (${G.gym+1}/${GYM.length}人目)`;
+}
+
+/* ================= ボックス ================= */
+function renderBox(){
+  const wrap=document.getElementById("boxSlots"); wrap.innerHTML="";
+  const mk=(m, label, btnTxt, fn)=>{
+    const d=document.createElement("div"); d.className="boxslot";
+    if(m){ d.appendChild(spriteCanvas(m.species,48)); }
+    else { const e=document.createElement("div"); e.style.cssText="width:48px;height:48px;flex:none;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:20px"; e.textContent="－"; d.appendChild(e); }
+    const info=document.createElement("div"); info.className="info";
+    info.innerHTML=`<b>${label}</b><br>${m?`${monLabel(m)}<br><span class="small">累計 ${m.total.toLocaleString()}歩</span>`:"(あき)"}`;
+    d.appendChild(info);
+    if(fn){ const b=document.createElement("button"); b.textContent=btnTxt; b.onclick=fn; d.appendChild(b); }
+    wrap.appendChild(d);
+  };
+  mk(G.active,"そだてちゅう",null,null);
+  G.freezer.forEach((f,i)=>{
+    mk(f, "ボックス"+(i+1), f?"入れ替え":"ここに保存", ()=>{
+      const tmp=G.freezer[i];
+      G.freezer[i]=G.active;
+      G.active=tmp||newEggMon();
+      if(!tmp) say("いまの子を冷凍保存して、新しいたまごを迎えたよ！",false);
+      else say(`${SPECIES[G.active.species].name} を起こしたよ！(冷凍中は成長ストップしてた)`,false);
+      saveGame(); renderAll();
+    });
+  });
+}
+
+/* ================= コード・交配 ================= */
+let breedPick=null;
+function renderCode(){
+  const list=document.getElementById("myCodeList"); list.innerHTML="";
+  const cands=[["育成中",G.active], ...G.freezer.map((f,i)=>["ボックス"+(i+1),f])].filter(([,m])=>m&&m.stage>=2);
+  if(!cands.length){ list.innerHTML=`<div class="small">成長期になるとコードを発行できるよ</div>`; }
+  for(const [label,m] of cands){
+    const d=document.createElement("div"); d.className="boxslot";
+    d.appendChild(spriteCanvas(m.species,48));
+    const info=document.createElement("div"); info.className="info";
+    info.innerHTML=`<b>${label}: ${SPECIES[m.species].name}</b>`;
+    d.appendChild(info);
+    const b=document.createElement("button"); b.textContent="コードをコピー";
+    b.onclick=async()=>{
+      const code=encodeMon(m,"");
+      try{ await navigator.clipboard.writeText(code); b.textContent="コピーした！"; }
+      catch(e){ prompt("このコードをコピーしてね", code); }
+      setTimeout(()=>b.textContent="コードをコピー",1800);
+    };
+    d.appendChild(b); list.appendChild(d);
+  }
+  // 交配相手(自分側)の選択
+  const bp=document.getElementById("breedMyPick"); bp.innerHTML="";
+  const adults=[["育成中",G.active], ...G.freezer.map((f,i)=>["ボックス"+(i+1),f])].filter(([,m])=>m&&m.stage===3);
+  if(!adults.length){ bp.innerHTML=`<div class="small">じぶんの成熟期モンスターがいないと交配できないよ</div>`; breedPick=null; }
+  else adults.forEach(([label,m],i)=>{
+    if(i===0&&!breedPick) breedPick=m;
+    const b=document.createElement("button"); b.className="btn "+(breedPick===m?"purple":"gray");
+    b.textContent=`${breedPick===m?"✔ ":""}${label}: ${SPECIES[m.species].name}`;
+    b.onclick=()=>{ breedPick=m; renderCode(); };
+    bp.appendChild(b);
+  });
+}
+document.getElementById("btnBreed").onclick=()=>{
+  if(!breedPick||breedPick.stage!==3){ alert("じぶんの成熟期モンスターを選んでね"); return; }
+  const d=decodeMon(document.getElementById("breedCode").value);
+  if(!d){ alert("相手のコードが読みとれなかったよ"); return; }
+  if(d.stage!==3){ alert("相手が成熟期じゃないと交配できないよ"); return; }
+  const slot=G.freezer.findIndex(f=>f===null);
+  if(slot<0){ alert("ボックスに空きがないよ。1枠あけてきてね"); return; }
+  const egg=breed(breedPick, d, todayKey());
+  G.freezer[slot]=egg;
+  document.getElementById("breedCode").value="";
+  saveGame(); renderAll();
+  say(`✨ひかるたまごが うまれた！(${egg.parents[0]} × ${egg.parents[1]}) ボックス${slot+1}に保存したよ`, false);
+};
+
+/* ================= 図鑑 ================= */
+function renderDex(){
+  const grid=document.getElementById("dexGrid"); grid.innerHTML="";
+  const list=Object.keys(SPECIES).filter(k=>SPECIES[k].stage>0).sort((a,b)=>SPECIES[a].dex-SPECIES[b].dex);
+  let seen=0;
+  for(const k of list){
+    const know=!!G.dex[k]; if(know) seen++;
+    const cell=document.createElement("div"); cell.className="dexcell"+(know?"":" unknown");
+    cell.appendChild(spriteCanvas(k,44));
+    const t=document.createElement("div"); t.textContent=know?SPECIES[k].name:"？？？";
+    cell.appendChild(t);
+    if(know&&SPECIES[k].desc){ cell.title=SPECIES[k].desc; cell.onclick=()=>say(`${SPECIES[k].name}: ${SPECIES[k].desc}`,false); }
+    grid.appendChild(cell);
+  }
+  document.getElementById("dexCount").textContent=`(${seen}/${list.length})`;
+}
+document.getElementById("btnReset").onclick=()=>{
+  if(!confirm("ほんとうに 全データをけして はじめから？")) return;
+  if(!confirm("冷凍ボックスの子も 図鑑も 全部きえるよ！ほんとうにいい？")) return;
+  G={v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0};
+  saveGame(); renderAll(); homeMsg();
+};
+
+/* ================= 目標歩数 ================= */
+const dlgGoal=document.getElementById("dlgGoal");
+document.getElementById("btnGoalOk").onclick=()=>{
+  const v=parseInt(document.getElementById("inpGoal").value,10);
+  if(isNaN(v)||v<500||v>30000){ alert("500〜30000で入力してね"); return; }
+  G.goal=v; saveGame(); dlgGoal.close(); renderAll(); homeMsg();
+  say(`目標は 1日${v.toLocaleString()}歩！むりなく続けよう`, false);
+};
+document.getElementById("btnGoal").onclick=()=>{ document.getElementById("inpGoal").value=G.goal||""; dlgGoal.showModal(); };
+if(!G.goal){ setTimeout(()=>{ try{dlgGoal.showModal();}catch(e){} }, 300); }
+
+/* ================= 起動 ================= */
+function renderAll(){ renderHome(); renderBattleMenu(); renderBox(); renderCode(); renderDex(); }
+seeDex(G.active.species);
+renderAll(); drawStage(); homeMsg();
+</script>
+</body>
+</html>
