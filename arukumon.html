@@ -12,6 +12,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{
   background:var(--shell);
   background-image:radial-gradient(circle at 50% 0%, #2e3150 0%, #23253a 60%);
@@ -21,6 +22,7 @@ body{
   overscroll-behavior:none;
 }
 #device{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;padding:10px 12px 14px;}
+#device>*{flex-shrink:0;} /* 液晶やナビが圧縮されて欠けるのを防止(内容が長い時はページスクロール) */
 h1.logo{font-size:18px;text-align:center;letter-spacing:2px;color:var(--yellow);text-shadow:2px 2px 0 var(--frame);margin-bottom:6px;}
 h1.logo small{color:#9aa0c0;font-size:11px;display:block;letter-spacing:0;}
 
@@ -36,8 +38,9 @@ h1.logo small{color:#9aa0c0;font-size:11px;display:block;letter-spacing:0;}
 }
 canvas.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block;width:100%;height:auto;}
 #lcdMsg{
-  position:absolute;left:0;right:0;bottom:0;padding:6px 8px;font-size:13px;line-height:1.5;
-  background:rgba(20,22,31,.82);color:#fff;min-height:1.4em;
+  padding:6px 8px;font-size:13px;line-height:1.5;
+  background:#14161f;color:#fff;min-height:1.4em;
+  border-top:3px solid var(--frame);position:relative;z-index:1;
 }
 
 /* パネル・カード */
@@ -72,7 +75,7 @@ button{font-family:inherit;font-size:14px;cursor:pointer;}
 #nav button.on{background:var(--yellow);color:var(--ink);}
 #nav .ico{display:block;font-size:16px;}
 
-.screen{display:none;flex:1;} .screen.on{display:block;}
+.screen{display:none;flex:1 0 auto;} .screen.on{display:block;}
 input[type=number],input[type=text],textarea{
   width:100%;font-family:inherit;font-size:16px;padding:9px;border:3px solid var(--frame);
   border-radius:8px;background:#fff;color:var(--ink);margin-top:6px;
@@ -85,7 +88,8 @@ textarea{height:74px;resize:none;word-break:break-all;}
 /* バトル */
 #btlScene{position:relative;}
 .hpbar{position:absolute;left:6px;top:6px;background:rgba(253,246,227,.92);border:2px solid var(--frame);
-  border-radius:6px;padding:3px 6px;font-size:11px;color:var(--ink);min-width:130px;}
+  border-radius:6px;padding:3px 6px;font-size:11px;color:var(--ink);min-width:110px;max-width:46%;
+  max-height:34%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .hpbar.foe{left:auto;right:6px;}
 .hpbar .gauge{margin:2px 0 0;}
 #moveBtns .btn{font-size:13px;padding:9px 6px;}
@@ -194,6 +198,13 @@ dialog::backdrop{background:rgba(10,10,20,.6);}
         <button class="btn" id="btnStepsOk">OK</button>
         <button class="btn gray" id="btnStepsCancel">やめる</button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlgDex">
+    <div class="panel">
+      <div id="dexDetail"></div>
+      <button class="btn gray" id="btnDexClose">とじる</button>
     </div>
   </dialog>
 
@@ -802,6 +813,32 @@ function breed(myMon, otherMon, dateStr){
   };
 }
 function newEggMon(){ return {species:"egg", stage:0, total:0, entries:[], hybrid:false, gen2:false, parentLines:null, seed:0}; }
+
+/* 図鑑プロフィール(体高・重さ・フレーバーテキスト) */
+const PROF = {
+petiwan:{hw:"体高18cm / 1.2kg", fl:"うまれてすぐ散歩に行きたがる。しっぽの回転数はうれしさに比例し、ときどき計測不能になる。"},
+mokumo:{hw:"体高25cm / 0.3kg", fl:"体のほとんどが謎のもこもこ。風の強い日は飛ばされないよう、こっそり何かにつかまっている。"},
+kowan:{hw:"体高40cm / 8kg", fl:"「さんぽ」という言葉を覚えており、聞こえると家の中を3周する。おすわりの姿勢の美しさに定評がある。"},
+goron:{hw:"体高60cm / 45kg", fl:"移動はもっぱら転がり。止まりたい場所で止まれず、だいたい壁で止まる。体に苔が生えはじめると少し照れる。"},
+picodora:{hw:"体高50cm / 6kg", fl:"火を吹く練習中だが、今のところ出るのはあたたかい息だけ。冬は湯たんぽとして家族に人気がある。"},
+haneko:{hw:"体高22cm / 0.5kg", fl:"歩くより飛ぶほうがずっと速いのに、なぜか散歩に付き合ってくれる。肩に乗るのが好き。"},
+garuwolf:{hw:"体高95cm / 32kg", fl:"風の速さで駆けるが、飼い主のペースに合わせて走るやさしさを持つ。遠吠えは天気予報より当たると評判。"},
+pomerin:{hw:"体高35cm / 3kg(うち毛2kg)", fl:"体重の大半が毛。もふもふラッシュを受けた者は、戦意といっしょに悩みも失うという。"},
+hesoten:{hw:"体長70cm / 20kg", fl:"一日の大半をへそ天で過ごす。無防備に見えるが、寝たまま繰り出す寝技は道場破りレベル。"},
+daikichimaru:{hw:"体高55cm / 14kg", fl:"赤いバンダナの伝説の忠犬。ゾロ目の日にだけ姿を見せる。どんなに強くなっても、呼べばかならず来てくれる。"},
+metalgolem:{hw:"体高180cm / 800kg", fl:"全身が鋼のからだ。雨の日に関節へ油をさしてもらう時間を、ひそかに楽しみにしている。"},
+kokedaman:{hw:"体高90cm / 60kg", fl:"背中の苔は「苔齢」100年。急がず慌てず、それでもジムを制覇した個体がいるという。"},
+burndorago:{hw:"体高160cm / 90kg", fl:"感情が高ぶると尻尾の炎が大きくなる。うれしい時がいちばん燃えるので、火の元に注意。"},
+leafdora:{hw:"体高150cm / 70kg", fl:"光合成で自給自足できる。日なたぼっこ中は、経験上なにをしても起きない。"},
+sonicfalco:{hw:"全長80cm / 5kg", fl:"急降下は音速を超える。ただし着地は苦手で、たまに転がる。プライドが高いので見なかったことにしよう。"},
+fukurou:{hw:"体高60cm / 4kg", fl:"森の長老。夜行性だが、みんなに合わせて昼間も起きていてくれる。羽毛の一枚一枚に知恵が宿るらしい。"},
+dorawolf:{hw:"体高110cm / 40kg", fl:"竜と狼、ふたつの血を引く。角は月夜にほのかに光り、迷子を家まで導いてくれるという。"},
+angepome:{hw:"体高40cm / 2kg", fl:"頭上の輪は本人も出し方を知らない。怒っても輪が外れないのが、本人のひそかな悩み。"},
+magmatitan:{hw:"体高200cm / 1200kg", fl:"体内のマグマは心の熱さそのもの。抱きしめると熱いので、心で抱きしめよう。"},
+prismdorago:{hw:"体高170cm / 60kg", fl:"七色に輝く鱗は、その日いっしょに歩いた人の気分を映すらしい。きれいな日はいい日。"},
+phantomgriffon:{hw:"体高130cm / 測定不能", fl:"影のように実体が薄く、体重計に乗っても数字が出ない。夜の散歩の護衛を得意とする。"},
+daikichiking:{hw:"体高60cm / 15kg(王冠ふくむ)", fl:"すべての犬系あるくもんの王。王冠は威厳のためではなく、みんなが見つけやすいための目印だという。"}
+};
 /* ===LOGIC_END=== */
 
 /* ================= セーブ (localStorage / 使えない環境ではメモリ) ================= */
@@ -814,8 +851,9 @@ function loadSave(){
 function saveGame(){
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); }catch(e){ memFallback=JSON.parse(JSON.stringify(G)); }
 }
-let G = loadSave() || {v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0, goal:null};
+let G = loadSave() || {v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0, goal:null, raised:{}};
 if(G.goal===undefined) G.goal=null;
+if(!G.raised) G.raised={};
 
 /* 日付は「朝5時」で切り替わる。深夜0時をまたいでも朝5時までは前日あつかい */
 const DAY_ROLLOVER_HOUR = 5;
@@ -931,6 +969,7 @@ document.getElementById("btnStepsOk").onclick=()=>{
   seeDex(G.active.species);
   let queue=[`きょうの歩数 ${v.toLocaleString()}歩 を記録した！`];
   for(const e of evs){
+    if(e.t==="hatch"||e.t==="evolve") G.raised[e.sp]=(G.raised[e.sp]||0)+1;
     if(e.t==="hatch") queue.push(`たまごが かえった！ ${SPECIES[e.sp].name} が うまれた！！`);
     if(e.t==="evolve") queue.push(`おっ…！？ すがたが かわっていく…！ ${SPECIES[e.sp].name} に しんかした！！`);
   }
@@ -1163,15 +1202,35 @@ function renderDex(){
     cell.appendChild(spriteCanvas(k,44));
     const t=document.createElement("div"); t.textContent=know?SPECIES[k].name:"？？？";
     cell.appendChild(t);
-    if(know&&SPECIES[k].desc){ cell.title=SPECIES[k].desc; cell.onclick=()=>say(`${SPECIES[k].name}: ${SPECIES[k].desc}`,false); }
+    cell.onclick=()=>openDexDetail(k, know);
     grid.appendChild(cell);
   }
   document.getElementById("dexCount").textContent=`(${seen}/${list.length})`;
 }
+const dlgDex=document.getElementById("dlgDex");
+document.getElementById("btnDexClose").onclick=()=>dlgDex.close();
+function openDexDetail(k, know){
+  const box=document.getElementById("dexDetail");
+  if(!know){
+    box.innerHTML=`<h2>No.${String(SPECIES[k].dex).padStart(2,"0")} ？？？</h2><div class="small">まだ出会っていない あるくもん。そだてるか、対戦で出会うと記録されるよ</div>`;
+    dlgDex.showModal(); return;
+  }
+  const sp=SPECIES[k], p=PROF[k]||{}, n=G.raised[k]||0;
+  box.innerHTML=`<h2>No.${String(sp.dex).padStart(2,"0")} ${sp.name} ${sp.type?`<span class="tag ${sp.type}">${sp.type==="P"?"パワー":sp.type==="S"?"スピード":"テクニック"}</span>`:""}</h2>
+    <div class="center" id="dexSprite" style="margin:6px 0"></div>
+    <div class="statgrid">
+      <div>${STAGE_NAME[sp.stage]}${sp.hybridOnly?"・交配限定":""}${sp.hidden?"・幻":""}</div>
+      <div>${p.hw||"？？？"}</div>
+    </div>
+    <div style="margin-top:6px">${p.fl||sp.desc||""}</div>
+    <div class="small" style="margin-top:6px">そだてた回数: ${n}回${n===0?"(対戦で出会った)":""}</div>`;
+  document.getElementById("dexSprite").appendChild(spriteCanvas(k,96));
+  dlgDex.showModal();
+}
 document.getElementById("btnReset").onclick=()=>{
   if(!confirm("ほんとうに 全データをけして はじめから？")) return;
   if(!confirm("冷凍ボックスの子も 図鑑も 全部きえるよ！ほんとうにいい？")) return;
-  G={v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0};
+  G={v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0, goal:G.goal, raised:{}};
   saveGame(); renderAll(); homeMsg();
 };
 
