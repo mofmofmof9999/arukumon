@@ -817,7 +817,9 @@ function saveGame(){
 let G = loadSave() || {v:1, active:newEggMon(), freezer:[null,null,null], dex:{}, gym:0, goal:null};
 if(G.goal===undefined) G.goal=null;
 
-const todayKey = ()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+/* 日付は「朝5時」で切り替わる。深夜0時をまたいでも朝5時までは前日あつかい */
+const DAY_ROLLOVER_HOUR = 5;
+const todayKey = (now)=>{ const d=new Date((now||Date.now()) - DAY_ROLLOVER_HOUR*3600*1000); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const seeDex = sp=>{ if(SPECIES[sp]&&SPECIES[sp].stage>0){ G.dex[sp]=true; } };
 
 /* ================= 描画 ================= */
