@@ -756,9 +756,11 @@ function addSteps(mon, steps, dateStr, goal){
   else { mon.entries.push({d:dateStr, steps}); mon.total += steps; }
   if(mon.entries.length>60) mon.entries = mon.entries.slice(-60);
   ev.push({t:"steps", steps});
+  /* 進化は1回の入力につき1段階まで(大幅超過達成でも成長期を飛ばさない)。
+     しきい値を超えていれば、翌日の入力で次の進化が来る */
   if(mon.stage===0 && steps>0){ ev.push({t:"hatch", sp:hatch(mon, steps, goal)}); }
-  if(mon.stage===1 && mon.total>=childAt(goal)){ ev.push({t:"evolve", sp:evolveChild(mon, avgRecent(mon.entries), goal)}); }
-  if(mon.stage===2 && mon.total>=adultAt(goal)){ ev.push({t:"evolve", sp:evolveAdult(mon, avgRecent(mon.entries), steps, goal)}); }
+  else if(mon.stage===1 && mon.total>=childAt(goal)){ ev.push({t:"evolve", sp:evolveChild(mon, avgRecent(mon.entries), goal)}); }
+  else if(mon.stage===2 && mon.total>=adultAt(goal)){ ev.push({t:"evolve", sp:evolveAdult(mon, avgRecent(mon.entries), steps, goal)}); }
   return ev;
 }
 
